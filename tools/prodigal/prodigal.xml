@@ -1,0 +1,111 @@
+<tool id="prodigal" name="prodigal" version="@TOOL_VERSION@">
+    <description>Find genes</description>
+    <macros>
+        <token name="@TOOL_VERSION@">2.6.3</token>
+    </macros>
+    <requirements>
+        <requirement type="package" version="@TOOL_VERSION@">prodigal</requirement>
+    </requirements>
+    <command detect_errors="exit_code">
+prodigal
+--input_file '$input_file'
+$closed
+--trans_table $trans_table
+--mode $mode
+$force_nonsd
+--output_format $output_format
+-o '$output_file'
+-s '$start_file'
+-d '$nuc_file'
+-a '$trans_file'
+-q
+    </command>
+    <!-- NYI -t training_file -->
+    <inputs>
+        <param argument="--input_file" type="data" format="fasta" label="Contig sequences"/>
+        <param argument="--closed" type="boolean" truevalue="--closed" falsevalue="" checked="false" label="Closed ends" help="Do not allow genes to run off edges"/>
+        <param argument="--trans_table" type="select" display="radio" label="Translation table">
+            <option value="1">The Standard Code</option>
+            <option value="2">The Vertebrate Mitochondrial Code</option>
+            <option value="3">The Yeast Mitochondrial Code</option>
+            <option value="4">The Mold, Protozoan, and Coelenterate Mitochondrial Code and the Mycoplasma/Spiroplasma Code</option>
+            <option value="5">The Invertebrate Mitochondrial Code</option>
+            <option value="6">The Ciliate, Dasycladacean and Hexamita Nuclear Code</option>
+            <option value="9">The Echinoderm and Flatworm Mitochondrial Code</option>
+            <option value="10">The Euplotid Nuclear Code</option>
+            <option value="11" selected="true">The Bacterial, Archaeal and Plant Plastid Code</option>
+            <option value="12">The Alternative Yeast Nuclear Code</option>
+            <option value="13">The Ascidian Mitochondrial Code</option>
+            <option value="14">The Alternative Flatworm Mitochondrial Code</option>
+            <option value="15">Blepharisma Nuclear Code</option>
+            <option value="16">Chlorophycean Mitochondrial Code</option>
+            <option value="21">Trematode Mitochondrial Code</option>
+            <option value="22">Scenedesmus Obliquus Mitochondrial Code</option>
+            <option value="23">Thraustochytrium Mitochondrial Code</option>
+        </param>
+        <param argument="--mode" type="select" display="radio" label="Select procedure">
+            <option value="single" selected="true">single</option>
+            <option value="meta">meta</option>
+        </param>
+        <param argument="--force_nonsd" type="boolean" truevalue="--force_nonsd" falsevalue="" checked="false" label="Bypass the Shine-Dalgarno RBS finder and force the program to scan for motifs"/>
+        <param argument="--output_format" type="select" display="radio" label="Output format">
+            <option value="gbk">gbk (genbank)</option>
+            <option value="gff" selected="true">gff (general feature format)</option>
+        </param>
+    </inputs>
+    <outputs>
+        <data name="output_file" format="gff">
+            <change_format>
+                <when input="output_format" value="gbk" format="genbank"/>
+            </change_format>
+        </data>
+        <data name="start_file" format="tabular" label="Potential genes (with scores)"/>
+        <data name="nuc_file" format="fasta" label="Nucleotide sequences of genes"/>
+        <data name="trans_file" format="fasta" label="Protein translations"/>
+    </outputs>
+    <tests>
+        <test>
+
+        </test>
+    </tests>
+    <help>
+**What it does**
+
+Prodigal (Prokaryotic Dynamic Programming Genefinding Algorithm) is a microbial (bacterial and archaeal) gene finding program developed at Oak Ridge National Laboratory and the University of Tennessee. Key features of Prodigal include:
+
+* Speed: Prodigal is an extremely fast gene recognition tool (written in very vanilla C). It can analyze an entire microbial genome in 30 seconds or less.
+* Accuracy: Prodigal is a highly accurate gene finder. It correctly locates the 3' end of every gene in the experimentally verified Ecogene data set (except those containing introns). It possesses a very sophisticated ribosomal binding site scoring system that enables it to locate the translation initiation site with great accuracy (96% of the 5' ends in the Ecogene data set are located correctly).
+* Specificity: Prodigal's false positive rate compares favorably with other gene identification programs, and usually falls under 5%.
+* GC-Content Indifferent: Prodigal performs well even in high GC genomes, with over a 90% perfect match (5'+3') to the Pseudomonas aeruginosa curated annotations.
+* Metagenomic Version: Prodigal can run in metagenomic mode and analyze sequences even when the organism is unknown.
+* Ease of Use: Prodigal can be run in one step on a single genomic sequence or on a draft genome containing many sequences. It does not need to be supplied with any knowledge of the organism, as it learns all the properties it needs to on its own.
+* Open Source: Prodigal source code is freely available under the General Public License.
+
+**Algorithm**
+
+Prodigal's algorithm for gene prediction follows the basic principle of KISS (Keep It Simple, Stupid). Compared to other methods, Prodigal's naive log-likelihood functions seem deceptively simple. Despite its lack of complexity (no Hidden Markov Model, no Interpolated Markov Model, etc.), Prodigal nonetheless achieves good results.
+
+The basic steps of the Prodigal algorithm can be summarized as follows:
+
+* Constructing a training set for protein coding: Many genefinders just take all open reading frames, or ORFs, above a certain size and consider them to be real genes. While this may be fine for low-GC genomes, this assumption proves dangerous in high GC organisms. Due to the lack of A and T in high GC genomes, there are many fewer stop codons. Long ORFs occur simply by chance in high GC genomes, and many of them aren't real genes at all. Prodigal addresses this problem with GC frame plot based training, wherein it examines all the ORFs in a genome looking for a bias for G or C in the 1st, 2nd, and 3rd positions of each codon. It then does a dynamic programming across the entire genome, building gene models using this frame plot bias as its only coding scoring function. While the gene models built by this initial run are far from perfect, they provide a sound enough basis to gather coding statistics from, and a far better basis than merely choosing all ORFs above a certain size.
+* Building log-likelihood coding statistics from the training data: Prodigal gathers dicodon (hexamer) statistics for all the genes in its initial dynamic programming model. The coding function is a simple log-likelihood of signal to background. Once this function has been established, every potential gene in the genome (all possible starts and stops) is scored. This simple function, plus the two factors listed below, are all Prodigal uses in the way of coding scores.
+* Sharpening coding scores: Once Prodigal has scored all potential candidates in a given ORF, it then implements a "sharpening" of the coding score, wherein it penalizes all potential start candidates that lie downstream from a higher-scoring start. The reason for this is that if we choose a more interior start in the dynamic programming stage, we are also NOT choosing the region upstream of that start. Therefore, an additional penalty is assigned representing this bypassing of a good coding region. For example, gene 3701-4000 has a score of 100. Gene 3763-4000 has a score of 75. We revise the score of gene 3763-4000 to be 75 minus the coding not selected (25), or 50.
+* Length factor to coding: A static length factor is added to the coding score. This factor is higher in low GC genomes, and lower in high GC genomes. If an ORF is especially long, but has negative coding, its coding score is artificially replaced with a small positive coding per base. This enables the long ORF to be recognized as a true gene, but it won't be chosen over a genuinely good alternative.
+* Iterative start training: For every open reading frame containing a gene with a coding score above a certain threshold, the translation initiation site with the highest coding score is recorded. This set of "coding peaks", although usually only 60-70% likely to be the true gene start, provides a sound foundation for start training. These starts are examined for ATG/GTG/TTG frequency and ribosomal binding site (RBS) motifs. The starts are then rescored based on these discoveries, and the new set of starts with the highest score in each ORF is selected. The start trainer iterates until the set of "best starts" no longer changes (usually only a few iterations). This final set of "best starts" is used as the training set for start scoring, and data is gathered from this set regarding RBS motifs, distances, and ATG/GTG/TTG frequency.
+* Final dynamic programming: A final dynamic programming is performed over the set of all start-stop pairs in the genome. Each potential gene's score is the sum of its start score and its coding score. Some small overlap is allowed between two genes on the same strand, and a greater amount of overlap is allowed for 3' ends of two genes on opposite strands. Bonuses are given to the scoring for potential operon distances, with larger bonuses given to -1 and -4 base overlaps between two genes on the same strand.
+
+**Website**
+
+http://prodigal.ornl.gov/
+
+**Referencing Prodigal**
+
+Hyatt D, Chen GL, Locascio PF, Land ML, Larimer FW, Hauser LJ. Prodigal: prokaryotic gene recognition and translation initiation site identification. BMC Bioinformatics. 2010 Mar 8;11(1):119. (Highly Accessed)
+
+http://www.biomedcentral.com/1471-2105/11/119/abstract
+http://www.biomedcentral.com/1471-2105/11/119
+    </help>
+    <citations>
+        <citation type="doi">10.1186/1471-2105-11-119</citation>
+    </citations>
+</tool>
